@@ -22,6 +22,7 @@ CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 _df: pd.DataFrame | None = None
 _data_loaded: bool = False
+_brute_df: pd.DataFrame | None = None
 
 
 def handle_errors(f):
@@ -38,7 +39,7 @@ def handle_errors(f):
 
 def load_data() -> None:
     """Load and combine CSV data files."""
-    global _df, _data_loaded
+    global _df, _data_loaded, _brute_df
 
     if _data_loaded:
         return
@@ -46,6 +47,7 @@ def load_data() -> None:
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
     honey_all_path = os.path.join(data_dir, "HoneyAllEvents_Clean.csv")
     honey_net_path = os.path.join(data_dir, "HoneyNetEvents_Clean.csv")
+    brute_force_path = os.path.join(data_dir, "BruteForce_Clean.csv")
 
     logger.info("Loading CSV files...")
 
@@ -53,6 +55,16 @@ def load_data() -> None:
     df_net = pd.read_csv(honey_net_path)
 
     _df = pd.concat([df_all, df_net], ignore_index=True)
+
+    # Load brute force data
+    try:
+        _brute_df = pd.read_csv(brute_force_path)
+        _brute_df["timestamp"] = pd.to_datetime(_brute_df["timestamp"])
+        _brute_df["date_only"] = _brute_df["timestamp"].dt.strftime("%Y-%m-%d")
+        logger.info(f"Loaded {_brute_df.shape[0]} brute force attempts")
+    except FileNotFoundError:
+        _brute_df = None
+        logger.warning("Brute force data not found")
 
     _df["timestamp"] = pd.to_datetime(_df["timestamp"], format="ISO8601", utc=True)
     _df = _df.sort_values("timestamp").reset_index(drop=True)
@@ -330,6 +342,159 @@ def get_geo_map():
             for _, row in geo.iterrows()
         ],
     })
+
+
+# =============================================================================
+# BRUTE FORCE API ROUTES
+# =============================================================================
+
+def ensure_brute_data() -> None:
+    """Ensure brute force data is available."""
+    global _brute_df
+    if _brute_df is None:
+        load_data()
+
+
+def safe_brute_response(data: dict) -> tuple:
+    """Create a JSON response for brute force endpoints."""
+    return jsonify({"success": True, "data": data}), 200
+
+
+@app.route("/api/brute/summary", methods=["GET"])
+@handle_errors
+def get_brute_summary():
+    """Summary statistics for brute force attempts."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response({
+            "totalAttempts": 0,
+            "uniqueUsernames": 0,
+            "uniquePasswords": 0,
+            "uniqueIPs": 0,
+            "defaultCredentialPct": 0.0,
+        })
+
+    total = len(_brute_df)
+    default_creds = int(_brute_df["is_default_credential"].sum())
+
+    return safe_brute_response({
+        "totalAttempts": total,
+        "uniqueUsernames": int(_brute_df["username"].nunique()),
+        "uniquePasswords": int(_brute_df["password"].nunique()),
+        "uniqueIPs": int(_brute_df["src_ip"].nunique()),
+        "defaultCredentialPct": round((default_creds / total) * 100, 2) if total > 0 else 0.0,
+    })
+
+
+@app.route("/api/brute/top-usernames", methods=["GET"])
+@handle_errors
+def get_brute_top_usernames():
+    """Top 20 usernames by attempt count."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    limit = 20
+    top = _brute_df["username"].value_counts().head(limit).reset_index()
+    top.columns = ["username", "count"]
+    top["count"] = top["count"].astype(int)
+
+    return safe_brute_response(top.to_dict(orient="records"))
+
+
+@app.route("/api/brute/top-passwords", methods=["GET"])
+@handle_errors
+def get_brute_top_passwords():
+    """Top 20 passwords by attempt count."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    limit = 20
+    top = _brute_df["password"].value_counts().head(limit).reset_index()
+    top.columns = ["password", "count"]
+    top["count"] = top["count"].astype(int)
+
+    return safe_brute_response(top.to_dict(orient="records"))
+
+
+@app.route("/api/brute/top-pairs", methods=["GET"])
+@handle_errors
+def get_brute_top_pairs():
+    """Top 20 username+password combinations by count."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    limit = 20
+    top = _brute_df.groupby(["username", "password"]).size().reset_index(name="count")
+    top = top.sort_values("count", ascending=False).head(limit)
+    top["count"] = top["count"].astype(int)
+
+    return safe_brute_response(top.to_dict(orient="records"))
+
+
+@app.route("/api/brute/password-types", methods=["GET"])
+@handle_errors
+def get_brute_password_types():
+    """Count of each password_type value."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    type_counts = _brute_df["password_type"].value_counts().reset_index()
+    type_counts.columns = ["type", "count"]
+    type_counts["count"] = type_counts["count"].astype(int)
+
+    return safe_brute_response(type_counts.to_dict(orient="records"))
+
+
+@app.route("/api/brute/password-lengths", methods=["GET"])
+@handle_errors
+def get_brute_password_lengths():
+    """Count of attempts per password_length value."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    length_counts = _brute_df["password_length"].value_counts().sort_index().reset_index()
+    length_counts.columns = ["length", "count"]
+    length_counts["length"] = length_counts["length"].astype(int)
+    length_counts["count"] = length_counts["count"].astype(int)
+
+    return safe_brute_response(length_counts.to_dict(orient="records"))
+
+
+@app.route("/api/brute/top-ips", methods=["GET"])
+@handle_errors
+def get_brute_top_ips():
+    """Top 20 attacking IPs by attempt count."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    limit = 20
+    top = _brute_df["src_ip"].value_counts().head(limit).reset_index()
+    top.columns = ["ip", "count"]
+    top["count"] = top["count"].astype(int)
+
+    return safe_brute_response(top.to_dict(orient="records"))
+
+
+@app.route("/api/brute/timeline", methods=["GET"])
+@handle_errors
+def get_brute_timeline():
+    """Attempt counts grouped by date."""
+    ensure_brute_data()
+    if _brute_df is None or _brute_df.empty:
+        return safe_brute_response([])
+
+    timeline = _brute_df.groupby("date_only").size().reset_index(name="count")
+    timeline.columns = ["date", "count"]
+    timeline["count"] = timeline["count"].astype(int)
+    timeline = timeline.sort_values("date")
+
+    return safe_brute_response(timeline.to_dict(orient="records"))
 
 
 @app.route("/api/health", methods=["GET"])

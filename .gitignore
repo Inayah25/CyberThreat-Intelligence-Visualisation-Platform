@@ -8,6 +8,8 @@ __pycache__/
 # Data files
 data/raw/
 data/*.csv
+data/*.json
+data/raw_brute_force
 
 # Node / React
 node_modules/
