@@ -58,9 +58,7 @@ export default function CredentialIntelligence() {
       bruteApi.topIps(),
       bruteApi.timeline(),
     ])
-      .then(([
-        sum, users, passes, pairs, types, lengths, ips, time,
-      ]) => {
+      .then(([sum, users, passes, pairs, types, lengths, ips, time]) => {
         setSummary(sum);
         setTopUsernames(users || []);
         setTopPasswords(passes || []);
@@ -86,13 +84,11 @@ export default function CredentialIntelligence() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Credential Intelligence</h1>
         <p className="text-gray-400 text-sm mt-1">SSH brute force attack analysis and credential patterns</p>
       </div>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Attempts" value={summary.totalAttempts?.toLocaleString()} />
         <StatCard label="Unique Usernames" value={summary.uniqueUsernames?.toLocaleString()} />
@@ -104,9 +100,7 @@ export default function CredentialIntelligence() {
         />
       </div>
 
-      {/* Top Usernames & Passwords */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Usernames */}
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Top 20 Usernames</h2>
           <p className="text-gray-400 text-sm mb-4">Most targeted usernames</p>
@@ -134,7 +128,6 @@ export default function CredentialIntelligence() {
           </div>
         </section>
 
-        {/* Top Passwords */}
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Top 20 Passwords</h2>
           <p className="text-gray-400 text-sm mb-4">Most common passwords tried</p>
@@ -163,7 +156,6 @@ export default function CredentialIntelligence() {
         </section>
       </div>
 
-      {/* Top Pairs Table */}
       <section className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-800">
           <h2 className="text-white font-semibold">Top 20 Credential Pairs</h2>
@@ -210,9 +202,7 @@ export default function CredentialIntelligence() {
         </div>
       </section>
 
-      {/* Password Types & Lengths */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Password Type Distribution */}
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Password Type Distribution</h2>
           <p className="text-gray-400 text-sm mb-4">Character composition of passwords</p>
@@ -241,7 +231,6 @@ export default function CredentialIntelligence() {
           </div>
         </section>
 
-        {/* Password Length Distribution */}
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Password Length Distribution</h2>
           <p className="text-gray-400 text-sm mb-4">Attempts by password length</p>
@@ -265,7 +254,6 @@ export default function CredentialIntelligence() {
         </section>
       </div>
 
-      {/* Top IPs */}
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-white font-semibold mb-1">Top 20 Attacking IPs</h2>
         <p className="text-gray-400 text-sm mb-4">Source IPs with most brute force attempts</p>
@@ -293,7 +281,6 @@ export default function CredentialIntelligence() {
         </div>
       </section>
 
-      {/* Attack Timeline */}
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-white font-semibold mb-1">Attack Timeline</h2>
         <p className="text-gray-400 text-sm mb-4">Brute force attempts over time</p>

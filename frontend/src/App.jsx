@@ -7,6 +7,7 @@ import TopPorts from './components/TopPorts';
 import Countries from './components/Countries';
 import Heatmap from './components/Heatmap';
 import EventTable from './components/EventTable';
+import WorldMap from './components/WorldMap';
 import CredentialIntelligence from './components/CredentialIntelligence';
 import { api } from './services/api';
 
@@ -101,6 +102,7 @@ function App() {
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
             <Overview />
+            <WorldMap />
             <TrendChart />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <AttackTypes />
