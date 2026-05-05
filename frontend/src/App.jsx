@@ -9,6 +9,7 @@ import Heatmap from './components/Heatmap';
 import EventTable from './components/EventTable';
 import WorldMap from './components/WorldMap';
 import CredentialIntelligence from './components/CredentialIntelligence';
+import ThreatIntelligence from './components/ThreatIntelligence';
 import { api } from './services/api';
 
 function App() {
@@ -94,6 +95,16 @@ function App() {
             >
               Credential Intelligence
             </button>
+            <button
+              onClick={() => setActiveTab('threat-intelligence')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'threat-intelligence'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Threat Intelligence
+            </button>
           </nav>
         </div>
       </header>
@@ -117,6 +128,7 @@ function App() {
           </div>
         )}
         {activeTab === 'credential-intelligence' && <CredentialIntelligence />}
+        {activeTab === 'threat-intelligence' && <ThreatIntelligence />}
       </main>
 
       <footer className="border-t border-gray-800 mt-12 py-6 text-center text-gray-500 text-sm">

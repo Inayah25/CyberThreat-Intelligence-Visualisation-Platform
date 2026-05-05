@@ -22,5 +22,6 @@ export const api = {
   },
   topSources: (limit = 20) => request(`/top-sources?limit=${limit}`),
   geoMap: () => request('/geo-map'),
+  threatMapping: () => request('/threat-mapping'),
   health: () => fetch(`${BASE_URL}/health`).then(r => r.json()),
 };
