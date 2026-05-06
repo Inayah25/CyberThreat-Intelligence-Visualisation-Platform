@@ -10,6 +10,7 @@ import EventTable from './components/EventTable';
 import WorldMap from './components/WorldMap';
 import CredentialIntelligence from './components/CredentialIntelligence';
 import ThreatIntelligence from './components/ThreatIntelligence';
+import Reports from './components/Reports';
 import { api } from './services/api';
 
 function App() {
@@ -105,6 +106,16 @@ function App() {
             >
               Threat Intelligence
             </button>
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'reports'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              Reports
+            </button>
           </nav>
         </div>
       </header>
@@ -129,6 +140,7 @@ function App() {
         )}
         {activeTab === 'credential-intelligence' && <CredentialIntelligence />}
         {activeTab === 'threat-intelligence' && <ThreatIntelligence />}
+        {activeTab === 'reports' && <Reports />}
       </main>
 
       <footer className="border-t border-gray-800 mt-12 py-6 text-center text-gray-500 text-sm">

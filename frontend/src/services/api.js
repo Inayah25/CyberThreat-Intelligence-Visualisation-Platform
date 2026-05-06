@@ -23,5 +23,18 @@ export const api = {
   topSources: (limit = 20) => request(`/top-sources?limit=${limit}`),
   geoMap: () => request('/geo-map'),
   threatMapping: () => request('/threat-mapping'),
+  reportPreview: (filters = {}) => {
+    const sp = new URLSearchParams(filters);
+    return request(`/report-preview?${sp}`);
+  },
+  generateReport: async (filters = {}) => {
+    const res = await fetch(`${BASE_URL}/generate-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(filters),
+    });
+    if (!res.ok) throw new Error(`PDF generation failed: ${res.status}`);
+    return res.blob();
+  },
   health: () => fetch(`${BASE_URL}/health`).then(r => r.json()),
 };

@@ -14,7 +14,7 @@ from functools import wraps
 import logging
 
 import requests as http_requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
 import pandas as pd
 
@@ -812,6 +812,296 @@ def get_threat_mapping():
         "active_tactics": active_tactics,
         "matrix": matrix,
     })
+
+
+# =============================================================================
+# REPORT GENERATION
+# =============================================================================
+
+def _compute_report_stats(filters: dict) -> dict:
+    """Compute filtered statistics for the report. Used by both preview and PDF."""
+    ensure_data()
+
+    dataset = filters.get("dataset", "both")
+    attack_type = filters.get("attack_type", "all")
+    country = filters.get("country", "all")
+    protocol = filters.get("protocol", "all")
+    password_type = filters.get("password_type", "all")
+    default_only = filters.get("default_only", False)
+
+    result = {
+        "filters_applied": {
+            "dataset": dataset,
+            "attack_type": attack_type,
+            "country": country,
+            "protocol": protocol,
+            "password_type": password_type,
+            "default_only": default_only,
+        },
+        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
+
+    # ── Honeynet section ─────────────────────────────────────────────────────
+    if dataset in ("honeynet", "both") and _df is not None:
+        df = _df
+        if attack_type != "all":
+            df = df[df["attackType"] == attack_type]
+        if country != "all":
+            df = df[df["srcCountryName"] == country]
+        if protocol != "all":
+            df = df[df["protocol"] == protocol]
+
+        total = len(df)
+        top_countries = df["srcCountryName"].value_counts().head(5)
+        top_protocols = df["protocol"].value_counts().head(5)
+        top_types = df["attackType"].value_counts().head(5)
+        timeline = (
+            df["timestamp"].dt.strftime("%Y-%m-%d")
+            .value_counts().sort_index()
+        )
+
+        # Auto-generated summary
+        summary = f"A total of {total:,} attack events were recorded matching the selected filters."
+        if total > 0 and len(top_countries) > 0:
+            tc_name = top_countries.index[0]
+            tc_pct = round(int(top_countries.iloc[0]) / total * 100, 1)
+            tp_name = top_protocols.index[0] if len(top_protocols) > 0 else "unknown"
+            tt_name = top_types.index[0] if len(top_types) > 0 else "unknown"
+            summary += (
+                f" The majority of attacks originated from {tc_name} ({tc_pct}%),"
+                f" primarily targeting {tp_name} services via the {tt_name} honeypot."
+            )
+
+        result["honeynet"] = {
+            "total_events": total,
+            "top_countries": [{"name": str(k), "count": int(v)} for k, v in top_countries.items()],
+            "top_protocols": [{"name": str(k), "count": int(v)} for k, v in top_protocols.items()],
+            "top_attack_types": [{"name": str(k), "count": int(v)} for k, v in top_types.items()],
+            "timeline": [{"date": str(k), "count": int(v)} for k, v in timeline.items()],
+            "summary": summary,
+        }
+
+    # ── Brute force section ──────────────────────────────────────────────────
+    if dataset in ("brute_force", "both"):
+        if _brute_df is not None and not _brute_df.empty:
+            bdf = _brute_df
+            if password_type != "all":
+                bdf = bdf[bdf["password_type"] == password_type]
+            if default_only:
+                bdf = bdf[bdf["is_default_credential"] == True]  # noqa: E712
+
+            total = len(bdf)
+            unique_users = int(bdf["username"].nunique()) if total > 0 else 0
+            unique_passes = int(bdf["password"].nunique()) if total > 0 else 0
+            default_count = int(bdf["is_default_credential"].sum()) if total > 0 else 0
+            default_pct = round((default_count / total) * 100, 2) if total > 0 else 0.0
+            top_usernames = bdf["username"].value_counts().head(5)
+            top_passwords = bdf["password"].value_counts().head(5)
+            pw_types = bdf["password_type"].value_counts()
+
+            summary = f"A total of {total:,} credential brute force attempts were recorded."
+            if total > 0 and len(top_usernames) > 0:
+                tu = top_usernames.index[0]
+                tu_pct = round(int(top_usernames.iloc[0]) / total * 100, 1)
+                summary += (
+                    f" {unique_users:,} unique usernames and {unique_passes:,} unique passwords were observed."
+                    f" The most targeted username was '{tu}' ({tu_pct}% of attempts)."
+                    f" {default_pct}% of attempts used default credentials."
+                )
+
+            result["brute_force"] = {
+                "total_attempts": total,
+                "unique_usernames": unique_users,
+                "unique_passwords": unique_passes,
+                "default_credential_pct": default_pct,
+                "top_usernames": [{"name": str(k), "count": int(v)} for k, v in top_usernames.items()],
+                "top_passwords": [{"name": str(k), "count": int(v)} for k, v in top_passwords.items()],
+                "password_type_distribution": [{"type": str(k), "count": int(v)} for k, v in pw_types.items()],
+                "summary": summary,
+            }
+        else:
+            result["brute_force"] = {
+                "total_attempts": 0, "unique_usernames": 0, "unique_passwords": 0,
+                "default_credential_pct": 0, "top_usernames": [], "top_passwords": [],
+                "password_type_distribution": [], "summary": "No brute force data available.",
+            }
+
+    return result
+
+
+def _build_report_html(stats: dict) -> str:
+    """Build an inline-styled HTML report for PDF rendering."""
+    filters = stats.get("filters_applied", {})
+    generated = stats.get("generated_at", "")
+
+    # Helper: build a two-column table from a list of {name, count} dicts
+    def _table(rows, col1="Name", col2="Count"):
+        if not rows:
+            return '<p style="color:#999;font-size:13px;">No data available</p>'
+        trs = ""
+        for i, r in enumerate(rows):
+            bg = "#f8f7ff" if i % 2 == 0 else "#fff"
+            name_key = "name" if "name" in r else "type"
+            trs += (
+                f'<tr style="background:{bg};">'
+                f'<td style="padding:8px 12px;border-bottom:1px solid #eee;">{r[name_key]}</td>'
+                f'<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:600;">'
+                f'{r["count"]:,}</td></tr>'
+            )
+        return (
+            f'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">'
+            f'<thead><tr style="background:#6d28d9;color:#fff;">'
+            f'<th style="padding:8px 12px;text-align:left;">{col1}</th>'
+            f'<th style="padding:8px 12px;text-align:right;">{col2}</th>'
+            f'</tr></thead><tbody>{trs}</tbody></table>'
+        )
+
+    # Filter summary rows
+    filter_rows = "".join(
+        f'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:600;">{k.replace("_", " ").title()}</td>'
+        f'<td style="padding:4px 0;color:#333;">{v}</td></tr>'
+        for k, v in filters.items()
+    )
+
+    # Build sections
+    honeynet_html = ""
+    if "honeynet" in stats:
+        h = stats["honeynet"]
+        honeynet_html = f"""
+        <div style="margin-bottom:32px;">
+            <h2 style="color:#6d28d9;font-size:20px;border-bottom:2px solid #6d28d9;padding-bottom:8px;">
+                Honeynet Attack Analysis
+            </h2>
+            <div style="background:#f0ecff;border-radius:8px;padding:16px;margin:16px 0;">
+                <span style="font-size:32px;font-weight:700;color:#1a1a2e;">{h['total_events']:,}</span>
+                <span style="color:#666;font-size:14px;margin-left:8px;">total attack events</span>
+            </div>
+            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;">
+                {h['summary']}
+            </p>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Countries</h4>
+                    {_table(h['top_countries'], 'Country', 'Events')}
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Protocols</h4>
+                    {_table(h['top_protocols'], 'Protocol', 'Events')}
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Attack Types</h4>
+                {_table(h['top_attack_types'], 'Attack Type', 'Events')}
+            </div>
+        </div>"""
+
+    brute_html = ""
+    if "brute_force" in stats:
+        b = stats["brute_force"]
+        pw_type_table = _table(b.get("password_type_distribution", []), "Type", "Count")
+        brute_html = f"""
+        <div style="margin-bottom:32px;">
+            <h2 style="color:#6d28d9;font-size:20px;border-bottom:2px solid #6d28d9;padding-bottom:8px;">
+                Brute Force Intelligence
+            </h2>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;">
+                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['total_attempts']:,}</div>
+                    <div style="color:#666;font-size:12px;">Total Attempts</div>
+                </div>
+                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['unique_usernames']:,}</div>
+                    <div style="color:#666;font-size:12px;">Unique Usernames</div>
+                </div>
+                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['unique_passwords']:,}</div>
+                    <div style="color:#666;font-size:12px;">Unique Passwords</div>
+                </div>
+                <div style="flex:1;min-width:140px;background:#fff0f0;border-radius:8px;padding:14px;text-align:center;">
+                    <div style="font-size:24px;font-weight:700;color:#dc2626;">{b['default_credential_pct']}%</div>
+                    <div style="color:#666;font-size:12px;">Default Credentials</div>
+                </div>
+            </div>
+            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;">
+                {b['summary']}
+            </p>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Usernames</h4>
+                    {_table(b['top_usernames'], 'Username', 'Attempts')}
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Passwords</h4>
+                    {_table(b['top_passwords'], 'Password', 'Attempts')}
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Password Type Distribution</h4>
+                {pw_type_table}
+            </div>
+        </div>"""
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Cyber Attack Intelligence Report</title></head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1a1a2e;max-width:800px;margin:0 auto;padding:40px;">
+    <div style="text-align:center;border-bottom:3px solid #6d28d9;padding-bottom:20px;margin-bottom:30px;">
+        <h1 style="color:#1a1a2e;margin:0;font-size:26px;">Cyber Attack Intelligence Report</h1>
+        <p style="color:#888;margin-top:8px;font-size:13px;">Generated: {generated}</p>
+    </div>
+    <div style="background:#f8f7ff;border:1px solid #e0dff5;border-radius:8px;padding:16px;margin-bottom:28px;">
+        <h3 style="margin:0 0 10px;color:#6d28d9;font-size:14px;">Report Filters Applied</h3>
+        <table style="font-size:13px;color:#444;">{filter_rows}</table>
+    </div>
+    {honeynet_html}
+    {brute_html}
+    <div style="text-align:center;border-top:2px solid #eee;padding-top:20px;margin-top:40px;color:#999;font-size:11px;">
+        Generated by Cyber Attack Intelligence Visualization Platform
+    </div>
+</body>
+</html>"""
+    return html
+
+
+@app.route("/api/report-preview", methods=["GET"])
+@handle_errors
+def get_report_preview():
+    """Return report statistics as JSON (for the in-page preview)."""
+    filters = {
+        "dataset": request.args.get("dataset", "both"),
+        "attack_type": request.args.get("attack_type", "all"),
+        "country": request.args.get("country", "all"),
+        "protocol": request.args.get("protocol", "all"),
+        "password_type": request.args.get("password_type", "all"),
+        "default_only": request.args.get("default_only", "false").lower() == "true",
+    }
+    stats = _compute_report_stats(filters)
+    return safe_response(stats)
+
+
+@app.route("/api/generate-report", methods=["POST"])
+@handle_errors
+def generate_report():
+    """Generate a PDF report and return as downloadable file."""
+    from weasyprint import HTML
+
+    body = request.get_json(force=True, silent=True) or {}
+    filters = {
+        "dataset": body.get("dataset", "both"),
+        "attack_type": body.get("attack_type", "all"),
+        "country": body.get("country", "all"),
+        "protocol": body.get("protocol", "all"),
+        "password_type": body.get("password_type", "all"),
+        "default_only": bool(body.get("default_only", False)),
+    }
+    stats = _compute_report_stats(filters)
+    html_content = _build_report_html(stats)
+    pdf = HTML(string=html_content).write_pdf()
+
+    response = make_response(pdf)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = "attachment; filename=cyber_attack_report.pdf"
+    return response
 
 
 if __name__ == "__main__":
