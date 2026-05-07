@@ -36,5 +36,7 @@ export const api = {
     if (!res.ok) throw new Error(`PDF generation failed: ${res.status}`);
     return res.blob();
   },
+  compareCountries: (country1, country2) =>
+    request(`/compare-countries?country1=${encodeURIComponent(country1)}&country2=${encodeURIComponent(country2)}`),
   health: () => fetch(`${BASE_URL}/health`).then(r => r.json()),
 };

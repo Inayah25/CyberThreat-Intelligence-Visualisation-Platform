@@ -1119,6 +1119,87 @@ def generate_report():
     return response
 
 
+# =============================================================================
+# COUNTRY COMPARISON API
+# =============================================================================
+
+
+def _compute_country_stats(df: pd.DataFrame, country: str) -> dict:
+    """Compute attack statistics for a single country."""
+    filtered = df[df["srcCountryName"] == country]
+
+    if filtered.empty:
+        return {
+            "name": country,
+            "no_data": True,
+            "total_attacks": 0,
+            "attack_types": [],
+            "top_protocols": [],
+            "top_ports": [],
+            "hourly_distribution": [{"hour": h, "count": 0} for h in range(24)],
+            "daily_distribution": [],
+            "first_seen": None,
+            "last_seen": None,
+        }
+
+    attack_types = filtered["attackType"].value_counts().reset_index()
+    attack_types.columns = ["type", "count"]
+
+    top_protocols = filtered["protocol"].value_counts().head(5).reset_index()
+    top_protocols.columns = ["protocol", "count"]
+
+    top_ports = filtered["dstPort"].value_counts().head(5).reset_index()
+    top_ports.columns = ["port", "count"]
+    top_ports["port"] = top_ports["port"].astype(int)
+
+    hourly = filtered["hour_of_day"].value_counts().reindex(range(24), fill_value=0)
+    hourly_dist = [{"hour": int(h), "count": int(c)} for h, c in hourly.items()]
+
+    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    daily = filtered["day_of_week"].value_counts()
+    daily_dist = [{"day": d, "count": int(daily.get(d, 0))} for d in day_order]
+
+    ts_min = filtered["timestamp"].min()
+    ts_max = filtered["timestamp"].max()
+
+    return {
+        "name": country,
+        "no_data": False,
+        "total_attacks": len(filtered),
+        "attack_types": attack_types.to_dict(orient="records"),
+        "top_protocols": top_protocols.to_dict(orient="records"),
+        "top_ports": top_ports.to_dict(orient="records"),
+        "hourly_distribution": hourly_dist,
+        "daily_distribution": daily_dist,
+        "first_seen": ts_min.isoformat() if pd.notna(ts_min) else None,
+        "last_seen": ts_max.isoformat() if pd.notna(ts_max) else None,
+    }
+
+
+@app.route("/api/compare-countries", methods=["GET"])
+@handle_errors
+def compare_countries():
+    """Compare attack statistics between two countries."""
+    ensure_data()
+
+    country1 = request.args.get("country1")
+    country2 = request.args.get("country2")
+
+    if not country1 or not country2:
+        return jsonify({"success": False, "error": "Both country1 and country2 are required"}), 400
+
+    available = sorted(_df["srcCountryName"].dropna().unique().tolist())
+
+    stats1 = _compute_country_stats(_df, country1)
+    stats2 = _compute_country_stats(_df, country2)
+
+    return safe_response({
+        "available_countries": available,
+        "country1": stats1,
+        "country2": stats2,
+    })
+
+
 if __name__ == "__main__":
     load_data()   # also calls build_cache()
     app.run(host="0.0.0.0", port=5000, debug=True)
