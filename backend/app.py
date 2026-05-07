@@ -930,12 +930,13 @@ def _compute_report_stats(filters: dict) -> dict:
 
 
 def _build_report_html(stats: dict) -> str:
-    """Build an inline-styled HTML report for PDF rendering."""
+    """Build an inline-styled HTML report for PDF rendering via xhtml2pdf.
+    Uses tables for layout (no flexbox — xhtml2pdf doesn't support it).
+    """
     filters = stats.get("filters_applied", {})
     generated = stats.get("generated_at", "")
 
-    # Helper: build a two-column table from a list of {name, count} dicts
-    def _table(rows, col1="Name", col2="Count"):
+    def _data_table(rows, col1="Name", col2="Count"):
         if not rows:
             return '<p style="color:#999;font-size:13px;">No data available</p>'
         trs = ""
@@ -956,14 +957,13 @@ def _build_report_html(stats: dict) -> str:
             f'</tr></thead><tbody>{trs}</tbody></table>'
         )
 
-    # Filter summary rows
     filter_rows = "".join(
-        f'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:600;">{k.replace("_", " ").title()}</td>'
+        f'<tr><td style="padding:4px 12px 4px 0;color:#666;font-weight:600;">'
+        f'{k.replace("_", " ").title()}</td>'
         f'<td style="padding:4px 0;color:#333;">{v}</td></tr>'
         for k, v in filters.items()
     )
 
-    # Build sections
     honeynet_html = ""
     if "honeynet" in stats:
         h = stats["honeynet"]
@@ -972,69 +972,77 @@ def _build_report_html(stats: dict) -> str:
             <h2 style="color:#6d28d9;font-size:20px;border-bottom:2px solid #6d28d9;padding-bottom:8px;">
                 Honeynet Attack Analysis
             </h2>
-            <div style="background:#f0ecff;border-radius:8px;padding:16px;margin:16px 0;">
-                <span style="font-size:32px;font-weight:700;color:#1a1a2e;">{h['total_events']:,}</span>
+            <div style="background:#f0ecff;padding:16px;margin:16px 0;">
+                <span style="font-size:28px;font-weight:700;color:#1a1a2e;">{h['total_events']:,}</span>
                 <span style="color:#666;font-size:14px;margin-left:8px;">total attack events</span>
             </div>
-            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;">
+            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;
+                       border-left:4px solid #f59e0b;padding:12px 16px;">
                 {h['summary']}
             </p>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                <div style="flex:1;min-width:200px;">
-                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Countries</h4>
-                    {_table(h['top_countries'], 'Country', 'Events')}
-                </div>
-                <div style="flex:1;min-width:200px;">
-                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Protocols</h4>
-                    {_table(h['top_protocols'], 'Protocol', 'Events')}
-                </div>
-            </div>
+            <table style="width:100%;margin-top:16px;" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="width:48%;vertical-align:top;padding-right:12px;">
+                        <h4 style="color:#333;font-size:14px;margin:0 0 4px;">Top Countries</h4>
+                        {_data_table(h['top_countries'], 'Country', 'Events')}
+                    </td>
+                    <td style="width:48%;vertical-align:top;padding-left:12px;">
+                        <h4 style="color:#333;font-size:14px;margin:0 0 4px;">Top Protocols</h4>
+                        {_data_table(h['top_protocols'], 'Protocol', 'Events')}
+                    </td>
+                </tr>
+            </table>
             <div style="margin-top:16px;">
                 <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Attack Types</h4>
-                {_table(h['top_attack_types'], 'Attack Type', 'Events')}
+                {_data_table(h['top_attack_types'], 'Attack Type', 'Events')}
             </div>
         </div>"""
 
     brute_html = ""
     if "brute_force" in stats:
         b = stats["brute_force"]
-        pw_type_table = _table(b.get("password_type_distribution", []), "Type", "Count")
+        pw_type_table = _data_table(b.get("password_type_distribution", []), "Type", "Count")
         brute_html = f"""
         <div style="margin-bottom:32px;">
             <h2 style="color:#6d28d9;font-size:20px;border-bottom:2px solid #6d28d9;padding-bottom:8px;">
                 Brute Force Intelligence
             </h2>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0;">
-                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
-                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['total_attempts']:,}</div>
-                    <div style="color:#666;font-size:12px;">Total Attempts</div>
-                </div>
-                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
-                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['unique_usernames']:,}</div>
-                    <div style="color:#666;font-size:12px;">Unique Usernames</div>
-                </div>
-                <div style="flex:1;min-width:140px;background:#f0ecff;border-radius:8px;padding:14px;text-align:center;">
-                    <div style="font-size:24px;font-weight:700;color:#1a1a2e;">{b['unique_passwords']:,}</div>
-                    <div style="color:#666;font-size:12px;">Unique Passwords</div>
-                </div>
-                <div style="flex:1;min-width:140px;background:#fff0f0;border-radius:8px;padding:14px;text-align:center;">
-                    <div style="font-size:24px;font-weight:700;color:#dc2626;">{b['default_credential_pct']}%</div>
-                    <div style="color:#666;font-size:12px;">Default Credentials</div>
-                </div>
-            </div>
-            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;">
+            <table style="width:100%;margin:16px 0;border-collapse:collapse;">
+                <tr>
+                    <td style="width:25%;text-align:center;background:#f0ecff;padding:14px;border:2px solid #fff;">
+                        <div style="font-size:22px;font-weight:700;color:#1a1a2e;">{b['total_attempts']:,}</div>
+                        <div style="color:#666;font-size:11px;">Total Attempts</div>
+                    </td>
+                    <td style="width:25%;text-align:center;background:#f0ecff;padding:14px;border:2px solid #fff;">
+                        <div style="font-size:22px;font-weight:700;color:#1a1a2e;">{b['unique_usernames']:,}</div>
+                        <div style="color:#666;font-size:11px;">Unique Usernames</div>
+                    </td>
+                    <td style="width:25%;text-align:center;background:#f0ecff;padding:14px;border:2px solid #fff;">
+                        <div style="font-size:22px;font-weight:700;color:#1a1a2e;">{b['unique_passwords']:,}</div>
+                        <div style="color:#666;font-size:11px;">Unique Passwords</div>
+                    </td>
+                    <td style="width:25%;text-align:center;background:#fff0f0;padding:14px;border:2px solid #fff;">
+                        <div style="font-size:22px;font-weight:700;color:#dc2626;">{b['default_credential_pct']}%</div>
+                        <div style="color:#666;font-size:11px;">Default Credentials</div>
+                    </td>
+                </tr>
+            </table>
+            <p style="color:#444;font-size:14px;line-height:1.6;margin:16px 0;background:#fffbf0;
+                       border-left:4px solid #f59e0b;padding:12px 16px;">
                 {b['summary']}
             </p>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                <div style="flex:1;min-width:200px;">
-                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Usernames</h4>
-                    {_table(b['top_usernames'], 'Username', 'Attempts')}
-                </div>
-                <div style="flex:1;min-width:200px;">
-                    <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Top Passwords</h4>
-                    {_table(b['top_passwords'], 'Password', 'Attempts')}
-                </div>
-            </div>
+            <table style="width:100%;margin-top:16px;" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td style="width:48%;vertical-align:top;padding-right:12px;">
+                        <h4 style="color:#333;font-size:14px;margin:0 0 4px;">Top Usernames</h4>
+                        {_data_table(b['top_usernames'], 'Username', 'Attempts')}
+                    </td>
+                    <td style="width:48%;vertical-align:top;padding-left:12px;">
+                        <h4 style="color:#333;font-size:14px;margin:0 0 4px;">Top Passwords</h4>
+                        {_data_table(b['top_passwords'], 'Password', 'Attempts')}
+                    </td>
+                </tr>
+            </table>
             <div style="margin-top:16px;">
                 <h4 style="color:#333;font-size:14px;margin-bottom:4px;">Password Type Distribution</h4>
                 {pw_type_table}
@@ -1044,18 +1052,20 @@ def _build_report_html(stats: dict) -> str:
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Cyber Attack Intelligence Report</title></head>
-<body style="font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1a1a2e;max-width:800px;margin:0 auto;padding:40px;">
+<body style="font-family:Helvetica,Arial,sans-serif;background:#fff;color:#1a1a2e;
+             width:700px;margin:0 auto;padding:40px 20px;">
     <div style="text-align:center;border-bottom:3px solid #6d28d9;padding-bottom:20px;margin-bottom:30px;">
-        <h1 style="color:#1a1a2e;margin:0;font-size:26px;">Cyber Attack Intelligence Report</h1>
-        <p style="color:#888;margin-top:8px;font-size:13px;">Generated: {generated}</p>
+        <h1 style="color:#1a1a2e;margin:0;font-size:24px;">Cyber Attack Intelligence Report</h1>
+        <p style="color:#888;margin-top:8px;font-size:12px;">Generated: {generated}</p>
     </div>
-    <div style="background:#f8f7ff;border:1px solid #e0dff5;border-radius:8px;padding:16px;margin-bottom:28px;">
+    <div style="background:#f8f7ff;border:1px solid #e0dff5;padding:16px;margin-bottom:28px;">
         <h3 style="margin:0 0 10px;color:#6d28d9;font-size:14px;">Report Filters Applied</h3>
-        <table style="font-size:13px;color:#444;">{filter_rows}</table>
+        <table style="font-size:12px;color:#444;">{filter_rows}</table>
     </div>
     {honeynet_html}
     {brute_html}
-    <div style="text-align:center;border-top:2px solid #eee;padding-top:20px;margin-top:40px;color:#999;font-size:11px;">
+    <div style="text-align:center;border-top:2px solid #eee;padding-top:20px;margin-top:40px;
+                color:#999;font-size:11px;">
         Generated by Cyber Attack Intelligence Visualization Platform
     </div>
 </body>
@@ -1083,7 +1093,8 @@ def get_report_preview():
 @handle_errors
 def generate_report():
     """Generate a PDF report and return as downloadable file."""
-    from weasyprint import HTML
+    import io
+    from xhtml2pdf import pisa
 
     body = request.get_json(force=True, silent=True) or {}
     filters = {
@@ -1096,9 +1107,13 @@ def generate_report():
     }
     stats = _compute_report_stats(filters)
     html_content = _build_report_html(stats)
-    pdf = HTML(string=html_content).write_pdf()
 
-    response = make_response(pdf)
+    pdf_buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    if pisa_status.err:
+        return jsonify({"error": "PDF generation failed", "success": False}), 500
+
+    response = make_response(pdf_buffer.getvalue())
     response.headers["Content-Type"] = "application/pdf"
     response.headers["Content-Disposition"] = "attachment; filename=cyber_attack_report.pdf"
     return response
