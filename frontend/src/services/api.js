@@ -38,5 +38,6 @@ export const api = {
   },
   compareCountries: (country1, country2) =>
     request(`/compare-countries?country1=${encodeURIComponent(country1)}&country2=${encodeURIComponent(country2)}`),
+  ipLookup: (ip) => request(`/ip-lookup?ip=${encodeURIComponent(ip)}`),
   health: () => fetch(`${BASE_URL}/health`).then(r => r.json()),
 };

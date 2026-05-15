@@ -12,6 +12,7 @@ import CredentialIntelligence from './components/CredentialIntelligence';
 import ThreatIntelligence from './components/ThreatIntelligence';
 import Reports from './components/Reports';
 import CountryComparison from './components/CountryComparison';
+import IPLookup from './components/IPLookup';
 import { api } from './services/api';
 
 function App() {
@@ -127,6 +128,16 @@ function App() {
             >
               Country Comparison
             </button>
+            <button
+              onClick={() => setActiveTab('ip-lookup')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'ip-lookup'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              IP Lookup
+            </button>
           </nav>
         </div>
       </header>
@@ -153,6 +164,7 @@ function App() {
         {activeTab === 'threat-intelligence' && <ThreatIntelligence />}
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'country-comparison' && <CountryComparison />}
+        {activeTab === 'ip-lookup' && <IPLookup />}
       </main>
 
       <footer className="border-t border-gray-800 mt-12 py-6 text-center text-gray-500 text-sm">

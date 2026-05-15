@@ -13,10 +13,14 @@ from datetime import datetime
 from functools import wraps
 import logging
 
+from dotenv import load_dotenv
 import requests as http_requests
 from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
 import pandas as pd
+
+load_dotenv()
+ABUSEIPDB_API_KEY = os.getenv('ABUSEIPDB_API_KEY')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1197,6 +1201,85 @@ def compare_countries():
         "available_countries": available,
         "country1": stats1,
         "country2": stats2,
+    })
+
+
+# =============================================================================
+# IP REPUTATION LOOKUP
+# =============================================================================
+
+@app.route("/api/ip-lookup", methods=["GET"])
+@handle_errors
+def ip_lookup():
+    """Look up an IP against AbuseIPDB and cross-reference local honeynet data."""
+    ensure_data()
+
+    ip = request.args.get("ip", "").strip()
+    if not ip:
+        return jsonify({"success": False, "error": "IP address is required"}), 400
+
+    if not ABUSEIPDB_API_KEY:
+        return jsonify({"success": False, "error": "API key not configured"}), 500
+
+    # ── AbuseIPDB query ───────────────────────────────────────────────────────
+    try:
+        resp = http_requests.get(
+            "https://api.abuseipdb.com/api/v2/check",
+            headers={"Key": ABUSEIPDB_API_KEY, "Accept": "application/json"},
+            params={"ipAddress": ip, "maxAgeInDays": 90, "verbose": True},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        abuse_json = resp.json()
+    except http_requests.exceptions.Timeout:
+        return jsonify({"success": False, "error": "AbuseIPDB request timed out"}), 502
+    except http_requests.exceptions.RequestException as e:
+        return jsonify({"success": False, "error": f"AbuseIPDB request failed: {e}"}), 502
+
+    if "errors" in abuse_json:
+        msgs = [e.get("detail", "Unknown error") for e in abuse_json["errors"]]
+        return jsonify({"success": False, "error": "; ".join(msgs)}), 400
+
+    d = abuse_json.get("data", {})
+    global_rep = {
+        "ip_address": d.get("ipAddress", ip),
+        "abuse_confidence_score": int(d.get("abuseConfidenceScore", 0)),
+        "country_code": d.get("countryCode"),
+        "country_name": d.get("countryName"),
+        "isp": d.get("isp"),
+        "domain": d.get("domain"),
+        "total_reports": int(d.get("totalReports", 0)),
+        "last_reported_at": d.get("lastReportedAt"),
+        "is_whitelisted": bool(d.get("isWhitelisted", False)),
+        "usage_type": d.get("usageType"),
+    }
+
+    # ── Local honeynet cross-reference ────────────────────────────────────────
+    local_df = _df[_df["srcIp"] == ip]
+    if local_df.empty:
+        local_obs = {
+            "found_locally": False,
+            "local_attack_count": 0,
+            "local_attack_types": [],
+            "local_protocols": [],
+            "local_first_seen": None,
+            "local_last_seen": None,
+            "local_country": None,
+        }
+    else:
+        local_obs = {
+            "found_locally": True,
+            "local_attack_count": len(local_df),
+            "local_attack_types": local_df["attackType"].dropna().unique().tolist(),
+            "local_protocols": local_df["protocol"].dropna().unique().tolist(),
+            "local_first_seen": str(local_df["timestamp"].min()),
+            "local_last_seen": str(local_df["timestamp"].max()),
+            "local_country": str(local_df["srcCountryName"].iloc[0]) if pd.notna(local_df["srcCountryName"].iloc[0]) else None,
+        }
+
+    return safe_response({
+        "global_reputation": global_rep,
+        "local_observations": local_obs,
     })
 
 
