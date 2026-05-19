@@ -4,3 +4,5 @@ flask-cors
 requests
 xhtml2pdf
 python-dotenv
+pytest
+pytest-flask
