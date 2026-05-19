@@ -44,22 +44,21 @@ export default function WorldMap() {
 
   const maxCount = markers.reduce((acc, m) => Math.max(acc, m.count), 1);
 
+  const getMousePos = (e) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
   const handleMouseMove = (e) => {
     if (!tooltip.visible) return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltip(t => ({ ...t, x: e.clientX - rect.left, y: e.clientY - rect.top }));
+    const pos = getMousePos(e);
+    setTooltip(t => ({ ...t, x: pos.x, y: pos.y }));
   };
 
   const showTooltip = (m, e) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltip({
-      visible: true,
-      content: m,
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+    const pos = getMousePos(e);
+    setTooltip({ visible: true, content: m, x: pos.x, y: pos.y });
   };
 
   const hideTooltip = () => setTooltip(t => ({ ...t, visible: false }));
@@ -67,7 +66,7 @@ export default function WorldMap() {
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
       <h2 className="text-white font-semibold mb-1">Threat Origin Map</h2>
-      <p className="text-gray-400 text-sm mb-4">IP addresses mapped to geolocation</p>
+      <p className="text-gray-500 text-xs mb-4">Geographic distribution of attack source IPs. Each marker represents one or more attack events originating from that location. Cluster numbers indicate attack density — click to zoom in.</p>
 
       {loading ? (
         <div className="h-[480px] bg-gray-800 rounded-lg animate-pulse" />
@@ -133,23 +132,31 @@ export default function WorldMap() {
             </ZoomableGroup>
           </ComposableMap>
 
-          {tooltip.visible && tooltip.content && (
-            <div
-              className="absolute z-20 pointer-events-none bg-gray-800 border border-gray-700 rounded-lg shadow-xl px-3 py-2 text-sm"
-              style={{
-                left: Math.min(tooltip.x + 14, 400),
-                top: Math.max(tooltip.y - 72, 8),
-              }}
-            >
-              <div className="font-semibold text-white mb-0.5">{tooltip.content.country}</div>
-              <div className="text-gray-300">
-                Attacks: <strong className="text-white">{tooltip.content.count.toLocaleString()}</strong>
+          {tooltip.visible && tooltip.content && (() => {
+            const ttWidth = 180;
+            const containerWidth = containerRef.current?.offsetWidth || 800;
+            const xPos = tooltip.x + ttWidth + 20 > containerWidth
+              ? tooltip.x - ttWidth - 10
+              : tooltip.x + 14;
+            const yPos = Math.max(tooltip.y - 72, 8);
+            const m = tooltip.content;
+            const city = m.city && m.city !== '' && m.city !== 'unknown' ? m.city : null;
+            const locationLabel = city ? `${city}, ${m.country}` : m.country;
+            return (
+              <div
+                className="absolute z-20 pointer-events-none bg-gray-800 border border-gray-700 rounded-lg shadow-xl px-3 py-2 text-sm"
+                style={{ left: xPos, top: yPos }}
+              >
+                <div className="font-semibold text-white mb-0.5">{locationLabel}</div>
+                <div className="text-gray-300">
+                  Attacks: <strong className="text-white">{m.count.toLocaleString()}</strong>
+                </div>
+                <div className="text-gray-500 text-xs mt-0.5">
+                  {m.lat.toFixed(2)}, {m.lon.toFixed(2)}
+                </div>
               </div>
-              <div className="text-gray-500 text-xs mt-0.5">
-                {tooltip.content.lat.toFixed(2)}, {tooltip.content.lon.toFixed(2)}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

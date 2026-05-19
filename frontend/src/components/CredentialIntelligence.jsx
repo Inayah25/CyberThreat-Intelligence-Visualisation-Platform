@@ -25,7 +25,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-function StatCard({ label, value, sub, accent }) {
+function StatCard({ label, value, sub, accent, caption }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-1">
       <span className="text-gray-400 text-xs uppercase tracking-wider">{label}</span>
@@ -33,6 +33,7 @@ function StatCard({ label, value, sub, accent }) {
         {value ?? '—'}
       </span>
       {sub && <span className="text-gray-500 text-xs">{sub}</span>}
+      {caption && <span className="text-gray-600 text-[0.7rem] leading-tight mt-0.5">{caption}</span>}
     </div>
   );
 }
@@ -87,23 +88,27 @@ export default function CredentialIntelligence() {
       <div>
         <h1 className="text-2xl font-bold text-white">Credential Intelligence</h1>
         <p className="text-gray-400 text-sm mt-1">SSH brute force attack analysis and credential patterns</p>
+        <p className="text-gray-500 text-xs mt-1">Data source: SSH Brute Force Dataset — 38,887 unique credential attempts from real SSH honeypot logs</p>
+        <p className="text-gray-500 text-xs mt-1.5 max-w-3xl leading-relaxed">This dataset captures real login attempts made by attackers against exposed SSH servers, recording the exact usernames and passwords tried. Analysing these patterns reveals which credentials attackers prioritise and how sophisticated their guessing strategies are.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Attempts" value={summary.totalAttempts?.toLocaleString()} />
-        <StatCard label="Unique Usernames" value={summary.uniqueUsernames?.toLocaleString()} />
-        <StatCard label="Unique Passwords" value={summary.uniquePasswords?.toLocaleString()} />
+        <StatCard label="Total Attempts" value={summary.totalAttempts?.toLocaleString()} caption="Total individual username and password combinations attempted" />
+        <StatCard label="Unique Usernames" value={summary.uniqueUsernames?.toLocaleString()} caption="Number of distinct usernames targeted by attackers" />
+        <StatCard label="Unique Passwords" value={summary.uniquePasswords?.toLocaleString()} caption="Number of distinct passwords tried across all attempts" />
         <StatCard
           label="% Default Credentials"
           value={`${summary.defaultCredentialPct?.toFixed(2) ?? '0.00'}%`}
           accent
+          caption="Percentage of attempts using known factory-default username/password pairs such as admin/admin or root/root"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Top 20 Usernames</h2>
-          <p className="text-gray-400 text-sm mb-4">Most targeted usernames</p>
+          <p className="text-gray-400 text-sm">Most targeted usernames</p>
+          <p className="text-gray-500 text-xs mb-3">The most frequently targeted usernames. Attackers prioritise common system and service account names they expect to find on exposed servers.</p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topUsernames} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
@@ -130,7 +135,8 @@ export default function CredentialIntelligence() {
 
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Top 20 Passwords</h2>
-          <p className="text-gray-400 text-sm mb-4">Most common passwords tried</p>
+          <p className="text-gray-400 text-sm">Most common passwords tried</p>
+          <p className="text-gray-500 text-xs mb-3">The most frequently attempted passwords. Presence of simple or default passwords confirms attackers rely heavily on dictionary-based guessing.</p>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topPasswords} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
@@ -160,6 +166,7 @@ export default function CredentialIntelligence() {
         <div className="p-6 border-b border-gray-800">
           <h2 className="text-white font-semibold">Top 20 Credential Pairs</h2>
           <p className="text-gray-400 text-sm">Most common username + password combinations</p>
+          <p className="text-gray-500 text-xs mt-1">The most tried credential combinations in full. Pairs matching known default credentials represent the highest risk to unpatched systems.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -205,7 +212,8 @@ export default function CredentialIntelligence() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Password Type Distribution</h2>
-          <p className="text-gray-400 text-sm mb-4">Character composition of passwords</p>
+          <p className="text-gray-400 text-sm">Character composition of passwords</p>
+          <p className="text-gray-500 text-xs mb-3">Categorisation of attempted passwords by character composition. A high proportion of numeric-only passwords indicates low-sophistication brute force tooling.</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -233,7 +241,8 @@ export default function CredentialIntelligence() {
 
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-white font-semibold mb-1">Password Length Distribution</h2>
-          <p className="text-gray-400 text-sm mb-4">Attempts by password length</p>
+          <p className="text-gray-400 text-sm">Attempts by password length</p>
+          <p className="text-gray-500 text-xs mb-3">Distribution of attempted password lengths. Most attackers try short passwords first, reflecting common weak password patterns.</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={passwordLengths} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
@@ -256,7 +265,8 @@ export default function CredentialIntelligence() {
 
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-white font-semibold mb-1">Top 20 Attacking IPs</h2>
-        <p className="text-gray-400 text-sm mb-4">Source IPs with most brute force attempts</p>
+        <p className="text-gray-400 text-sm">Source IPs with most brute force attempts</p>
+        <p className="text-gray-500 text-xs mb-3">The IP addresses submitting the highest volume of credential attempts. High counts from a single IP suggest automated attack tooling.</p>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topIps} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
@@ -283,7 +293,8 @@ export default function CredentialIntelligence() {
 
       <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-white font-semibold mb-1">Attack Timeline</h2>
-        <p className="text-gray-400 text-sm mb-4">Brute force attempts over time</p>
+        <p className="text-gray-400 text-sm">Brute force attempts over time</p>
+        <p className="text-gray-500 text-xs mb-3">Volume of credential attempts over time. Sustained flat patterns suggest automated tooling running continuously rather than targeted manual attacks.</p>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={timeline} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>

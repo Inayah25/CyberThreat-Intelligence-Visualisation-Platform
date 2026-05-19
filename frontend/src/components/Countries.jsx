@@ -13,7 +13,8 @@ export default function Countries() {
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
       <h2 className="text-white font-semibold mb-1">Source Countries</h2>
-      <p className="text-gray-400 text-sm mb-6">Top attacking nations</p>
+      <p className="text-gray-400 text-sm">Top attacking nations</p>
+      <p className="text-gray-500 text-xs mb-4">Countries generating the highest number of attack events. Note: this reflects the origin of attack traffic, not necessarily the attacker's physical location.</p>
       <div className="space-y-3">
         {data.map((item, i) => (
           <div key={item.country} className="flex items-center gap-3">

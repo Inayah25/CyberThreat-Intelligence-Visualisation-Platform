@@ -27,7 +27,8 @@ export default function AttackTypes() {
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
       <h2 className="text-white font-semibold mb-1">Attack Types</h2>
-      <p className="text-gray-400 text-sm mb-6">Most common attack patterns</p>
+      <p className="text-gray-400 text-sm">Most common attack patterns</p>
+      <p className="text-gray-500 text-xs mb-4">Breakdown of attacks by honeypot type. Cowrie captures SSH/Telnet attempts, Dionaea captures malware and service exploitation, SentryPeer captures VoIP/SIP scanning.</p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>

@@ -24,7 +24,8 @@ export default function Protocols() {
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
       <h2 className="text-white font-semibold mb-1">Protocol Distribution</h2>
-      <p className="text-gray-400 text-sm mb-6">Attack volume by network protocol</p>
+      <p className="text-gray-400 text-sm">Attack volume by network protocol</p>
+      <p className="text-gray-500 text-xs mb-4">The most commonly used network protocols in observed attacks. Dominance of a single protocol indicates targeted exploitation of that service.</p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

@@ -145,6 +145,16 @@ function App() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
+            <section>
+              <h2 className="text-xl font-bold text-white mb-2">Cyber Attack Intelligence Visualization Platform</h2>
+              <p className="text-gray-400 text-sm leading-relaxed max-w-4xl">
+                This platform analyses real-world cyberattack data collected from honeypot sensors deployed across cloud infrastructure.
+                It visualises attack patterns, geographic origins, credential exploitation attempts, and threat intelligence mappings
+                derived from two public datasets — a 2025 Azure Cloud Honeynet dataset and an SSH brute force credential dataset.
+                Use it to explore how attackers behave, where they originate from, and what techniques they use.
+              </p>
+              <p className="text-gray-500 text-xs mt-2">Data source: Multi-Regional Azure Cloud Honeynet (2025) — 132,425 attack events across 95 countries</p>
+            </section>
             <Overview />
             <WorldMap />
             <TrendChart />

@@ -34,6 +34,7 @@ export default function TrendChart() {
         <div>
           <h2 className="text-white font-semibold">Event Trends</h2>
           <p className="text-gray-400 text-sm">Attack volume over time</p>
+          <p className="text-gray-500 text-xs mt-0.5">Volume of attack events over time. Spikes indicate coordinated attack bursts or automated scanning waves.</p>
         </div>
         <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
           {['day', 'hour'].map(gb => (

@@ -56,6 +56,7 @@ export default function Heatmap() {
         <div>
           <h2 className="text-white font-semibold">Attack Heatmap</h2>
           <p className="text-gray-400 text-sm mt-0.5">Hour of day vs day of week</p>
+          <p className="text-gray-500 text-xs mt-0.5">Attack frequency by hour of day and day of week. Brighter cells indicate higher attack volumes during that time window, revealing when attackers are most active.</p>
         </div>
         {/* Live hover readout */}
         <div className="text-right min-h-[36px]">
