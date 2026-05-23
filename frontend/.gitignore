@@ -1,22 +1,5 @@
-# Python
-venv/
-__pycache__/
-*.pyc
-*.pyo
-.env
-
-# Data files
-data/raw/
-data/*.csv
-
 # Node / React
 node_modules/
-dist/
-dist-ssr
-*.local
-
-node_modules
-dist
 dist-ssr
 *.local
 
@@ -29,8 +12,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-
-# Editor directories and files
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -40,6 +22,3 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-# Claude AI folder
-.claude/
