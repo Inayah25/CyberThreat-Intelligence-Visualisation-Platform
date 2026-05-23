@@ -11,14 +11,8 @@ data/raw_brute_force/
 
 # Node / React
 node_modules/
-dist/
 dist-ssr
-*.local
-
-node_modules
-dist
-dist-ssr
-*.local
+frontend/node_modules/
 
 # Logs
 logs

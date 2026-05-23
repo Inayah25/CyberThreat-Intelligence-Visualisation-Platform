@@ -15,7 +15,7 @@ import logging
 
 from dotenv import load_dotenv
 import requests as http_requests
-from flask import Flask, jsonify, make_response, request
+from flask import Flask, jsonify, make_response, request, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 
@@ -25,7 +25,7 @@ ABUSEIPDB_API_KEY = os.getenv('ABUSEIPDB_API_KEY')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 # ─── Raw data ─────────────────────────────────────────────────────────────────
@@ -1281,6 +1281,18 @@ def ip_lookup():
         "global_reputation": global_rep,
         "local_observations": local_obs,
     })
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    import os as _os
+    if path.startswith('api/'):
+        return {'error': 'Not found'}, 404
+    dist_dir = _os.path.join(_os.path.dirname(__file__), '..', 'frontend', 'dist')
+    if path and _os.path.exists(_os.path.join(dist_dir, path)):
+        return send_from_directory(dist_dir, path)
+    return send_from_directory(dist_dir, 'index.html')
 
 
 if __name__ == "__main__":

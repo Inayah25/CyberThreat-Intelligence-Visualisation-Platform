@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: cyber-threat-dashboard
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --timeout 120
+    envVars:
+      - key: ABUSEIPDB_API_KEY
+        sync: false
