@@ -163,22 +163,28 @@ export default function EventTable() {
           >
             Prev
           </button>
-          {[...Array(Math.min(5, pagination.pages || 1))].map((_, i) => {
-            const page = Math.max(1, Math.min(pagination.page - 2 + i, pagination.pages || 1));
-            return (
-              <button
-                key={page}
-                className={`px-3 py-1 text-xs rounded transition-colors ${
-                  page === pagination.page
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-                onClick={() => handlePage(page)}
-              >
-                {page}
-              </button>
-            );
-          })}
+          {(() => {
+            const total = pagination.pages || 1;
+            const current = pagination.page || 1;
+            const windowSize = Math.min(5, total);
+            const half = Math.floor(windowSize / 2);
+            let start = Math.max(1, current - half);
+            let end = Math.min(total, start + windowSize - 1);
+            start = Math.max(1, end - windowSize + 1);
+            return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+          })().map(page => (
+            <button
+              key={page}
+              className={`px-3 py-1 text-xs rounded transition-colors ${
+                page === pagination.page
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+              onClick={() => handlePage(page)}
+            >
+              {page}
+            </button>
+          ))}
           <button
             className="px-3 py-1 bg-gray-800 text-gray-300 text-xs rounded disabled:opacity-40 hover:bg-gray-700 transition-colors"
             disabled={pagination.page >= pagination.pages}
