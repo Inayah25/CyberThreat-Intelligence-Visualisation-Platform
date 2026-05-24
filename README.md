@@ -48,6 +48,7 @@ A full-stack cybersecurity threat intelligence dashboard that transforms real-wo
 - [AbuseIPDB API](https://www.abuseipdb.com) — real-time IP reputation and abuse confidence scoring
 
 ## Project Structure
+```
 CyberThreat-Intelligence-Visualisation-Platform/
 ├── backend/
 │   ├── app.py                    # Flask server and all API routes
@@ -69,6 +70,7 @@ CyberThreat-Intelligence-Visualisation-Platform/
 │   └── package.json
 ├── render.yaml                   # Render deployment configuration
 └── README.md
+```
 ## Running Locally
 
 ### Prerequisites
