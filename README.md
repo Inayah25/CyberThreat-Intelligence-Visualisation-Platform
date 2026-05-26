@@ -61,6 +61,8 @@ CyberThreat-Intelligence-Visualisation-Platform/
 │   ├── HoneyNetEvents_Clean.csv  # Cleaned honeynet dataset (subset)
 │   ├── BruteForce_Clean.csv      # Cleaned brute force dataset
 │   └── enterprise-attack.json   # MITRE ATT&CK local cache
+                                  # (fetched live from MITRE GitHub on first run, 
+                                  # cached locally for subsequent startups)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/           # All React page components
